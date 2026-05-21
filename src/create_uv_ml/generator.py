@@ -2,9 +2,32 @@
 
 from typing import Literal
 
-Framework = Literal["PyTorch", "TensorFlow", "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)"]
+Framework = Literal[
+    "PyTorch",
+    "TensorFlow",
+    "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)",
+]
 CudaVersion = Literal["CUDA 12.1 (Recommended)", "CUDA 11.8", "CPU Only"]
 
+# Short-name aliases for CLI --framework and --cuda options
+FRAMEWORK_ALIASES: dict[str, Framework] = {
+    "pytorch": "PyTorch",
+    "tensorflow": "TensorFlow",
+    "scipy": "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)",
+}
+
+CUDA_ALIASES: dict[str, CudaVersion] = {
+    "cu121": "CUDA 12.1 (Recommended)",
+    "cu118": "CUDA 11.8",
+    "cpu": "CPU Only",
+}
+
+# Dynamic requires-python based on framework (PyTorch CUDA wheels lack cp313)
+REQUIRES_PYTHON_MAP: dict[Framework, str] = {
+    "PyTorch": ">=3.10,<3.13",
+    "TensorFlow": ">=3.10",
+    "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)": ">=3.10",
+}
 
 CUDA_INDEX_MAP = {
     "CUDA 12.1 (Recommended)": {
@@ -47,7 +70,10 @@ explicit = true""")
                     sources_sections.append(f'{pkg} = [{{ index = "{idx["name"]}", {marker} }}]')
 
     elif framework == "TensorFlow":
-        deps.append("tensorflow>=2.16.0")
+        if cuda and cuda != "CPU Only":
+            deps.append("tensorflow[and-cuda]>=2.16.0")
+        else:
+            deps.append("tensorflow>=2.16.0")
     else:
         deps.extend([
             "numpy>=1.26.0",
@@ -56,6 +82,11 @@ explicit = true""")
             "scikit-learn>=1.4.0",
         ])
 
+    # Dynamic requires-python: relax upper bound for PyTorch CPU-only
+    requires_python = REQUIRES_PYTHON_MAP[framework]
+    if framework == "PyTorch" and cuda == "CPU Only":
+        requires_python = ">=3.10"
+
     deps_str = "\n".join(f'    "{d}",' for d in deps)
 
     toml = f"""[project]
@@ -63,7 +94,7 @@ name = "{project_name}"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = "{requires_python}"
 dependencies = [
 {deps_str}
 ]

@@ -3,7 +3,24 @@ name = "create-uv-ml"
 version = "0.1.0"
 description = "A CLI scaffolding tool to quickly bootstrap deep learning projects with uv"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.10"
+authors = [
+    { name = "qwtoe", email = "2480340264@qq.com" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "questionary>=2.1.1",
     "rich>=15.0.0",
@@ -13,9 +30,39 @@ dependencies = [
 [project.scripts]
 create-uv-ml = "create_uv_ml.main:app"
 
+[project.urls]
+Homepage = "https://github.com/slowcage/create-uv-ml"
+Repository = "https://github.com/slowcage/create-uv-ml"
+Issues = "https://github.com/slowcage/create-uv-ml/issues"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.11.0",
+    "mypy>=1.10.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/create_uv_ml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

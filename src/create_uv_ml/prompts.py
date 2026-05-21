@@ -1,22 +1,13 @@
 """Interactive prompt module for collecting user configuration choices."""
 
 from typing import cast
+
 import questionary
 
-from create_uv_ml.generator import Framework, CudaVersion
+from create_uv_ml.generator import CUDA_ALIASES, FRAMEWORK_ALIASES, CudaVersion, Framework
 
-
-FRAMEWORK_CHOICES = [
-    "PyTorch",
-    "TensorFlow",
-    "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)",
-]
-
-CUDA_CHOICES = [
-    "CUDA 12.1 (Recommended)",
-    "CUDA 11.8",
-    "CPU Only",
-]
+FRAMEWORK_CHOICES = list(FRAMEWORK_ALIASES.values())
+CUDA_CHOICES = list(CUDA_ALIASES.values())
 
 
 def ask_framework() -> Framework:
@@ -31,7 +22,7 @@ def ask_framework() -> Framework:
 
 
 def ask_cuda_version() -> CudaVersion:
-    """Ask the user to select a CUDA version (only needed for PyTorch)."""
+    """Ask the user to select a CUDA version."""
     return cast(
         CudaVersion,
         questionary.select(
