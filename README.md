@@ -18,11 +18,33 @@ An interactive CLI scaffolding tool to quickly bootstrap deep learning projects 
 - 📁 **Project Templates** — Full scaffold with `.gitignore`, `README.md`, training scripts, and `data/` directory
 - ⚡ **CLI Options** — `--framework`, `--cuda`, `--no-sync`, `--template` for non-interactive usage
 
+## Prerequisites
+
+- **Python 3.10+** — [Download](https://www.python.org/downloads/) (Windows users: check "Add Python to PATH" during installation)
+- **uv** — Fast Python package manager ([why uv?](https://docs.astral.sh/uv/))
+
+Install uv:
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Verify both are available:
+
+```bash
+python --version   # Python 3.10.x or higher
+uv --version       # uv 0.x.x
+```
+
 ## Installation
 
 ```bash
 pip install create-uv-ml
-# or, if you already use uv
+# or, if you already use uv (recommended)
 uv tool install create-uv-ml
 ```
 
@@ -120,7 +142,32 @@ my_project/
 
 The generated `pyproject.toml` includes the correct `[[tool.uv.index]]` and `[tool.uv.sources]` entries for PyTorch CUDA wheels when applicable, so `uv sync` resolves GPU-enabled packages out of the box.
 
-## Development
+## After Creation
+
+Once the project is created, enter the directory and activate the environment:
+
+```bash
+cd my_project
+source .venv/bin/activate        # macOS / Linux
+# or
+.venv\Scripts\activate           # Windows
+```
+
+If you used `--no-sync`, install dependencies first:
+
+```bash
+uv sync
+```
+
+Run the training script (included in the `full` template):
+
+```bash
+python src/my_project/train.py
+```
+
+The generated `train.py` contains a complete, runnable training loop — just replace the dummy data and model with your own.
+
+## FAQ
 
 ```bash
 git clone https://github.com/slowcage/create-uv-ml.git
