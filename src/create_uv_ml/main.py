@@ -1,5 +1,6 @@
 """CLI entrypoint module."""
 
+import os
 
 import typer
 from rich.console import Console
@@ -99,6 +100,7 @@ def create(
     )
 
     # Post-creation guidance
+    pkg_name = os.path.basename(project_name)
     console.print(
         f"\n[bold green]✅ Project {project_name} created successfully! "
         "Happy training![/bold green]"
@@ -114,7 +116,7 @@ def create(
     step += 1
     if template == "full":
         script = "train.py" if selected_framework in ("PyTorch", "TensorFlow") else "analysis.py"
-        console.print(f"  [dim]{step}.[/dim] python src/{project_name}/{script}")
+        console.print(f"  [dim]{step}.[/dim] python src/{pkg_name}/{script}")
 
 
 @app.command()

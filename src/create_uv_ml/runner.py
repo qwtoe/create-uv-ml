@@ -30,9 +30,15 @@ def check_uv_available() -> None:
 
 def validate_project_name(name: str) -> None:
     """Validate that the project name is a legal Python package name."""
-    if not name.isidentifier():
-        console.print(f"[bold red]Error: '{name}' is not a valid Python package name.[/bold red]")
-        console.print("Use only letters, digits, and underscores, and don't start with a digit.")
+    # Extract the final component if a path is given
+    pkg_name = os.path.basename(name)
+    if not pkg_name.isidentifier():
+        console.print(
+            f"[bold red]Error: '{pkg_name}' is not a valid Python package name.[/bold red]"
+        )
+        console.print(
+            "Use only letters, digits, and underscores, and don't start with a digit."
+        )
         sys.exit(1)
 
 
@@ -52,6 +58,7 @@ def create_project(
 
     try:
         # Create directory structure
+        pkg_name = os.path.basename(project_name)
         console.print(f"[yellow]📁 Creating project directory: {project_name}[/yellow]")
         os.makedirs(project_name, exist_ok=True)
 
@@ -70,24 +77,23 @@ def create_project(
         # Write README.md
         readme_path = os.path.join(project_name, "README.md")
         with open(readme_path, "w", encoding="utf-8") as f:
-            f.write(generate_readme(project_name, framework, cuda))
+            f.write(generate_readme(pkg_name, framework, cuda))
         console.print(f"[green]  ✓ Wrote {readme_path}[/green]")
 
         # Write src layout and training script (full template only)
         if template == "full":
-            pkg_name = os.path.basename(project_name)
             src_dir = os.path.join(project_name, "src", pkg_name)
             os.makedirs(src_dir, exist_ok=True)
 
             init_path = os.path.join(src_dir, "__init__.py")
             with open(init_path, "w", encoding="utf-8") as f:
-                f.write(generate_init_py(project_name))
+                f.write(generate_init_py(pkg_name))
             console.print(f"[green]  ✓ Wrote {init_path}[/green]")
 
             script_name = "train.py" if framework in ("PyTorch", "TensorFlow") else "analysis.py"
             script_path = os.path.join(src_dir, script_name)
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(generate_train_py(project_name, framework))
+                f.write(generate_train_py(pkg_name, framework))
             console.print(f"[green]  ✓ Wrote {script_path}[/green]")
 
             # Create data directory
