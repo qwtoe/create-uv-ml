@@ -9,8 +9,9 @@ Framework = Literal[
     "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)",
 ]
 CudaVersion = Literal["CUDA 12.1 (Recommended)", "CUDA 11.8", "CPU Only"]
+MirrorSource = Literal["Default (PyPI)", "Tsinghua (China)", "Aliyun (China)"]
 
-# Short-name aliases for CLI --framework and --cuda options
+# Short-name aliases for CLI --framework, --cuda, and --mirror options
 FRAMEWORK_ALIASES: dict[str, Framework] = {
     "pytorch": "PyTorch",
     "tensorflow": "TensorFlow",
@@ -21,6 +22,12 @@ CUDA_ALIASES: dict[str, CudaVersion] = {
     "cu121": "CUDA 12.1 (Recommended)",
     "cu118": "CUDA 11.8",
     "cpu": "CPU Only",
+}
+
+MIRROR_ALIASES: dict[str, MirrorSource] = {
+    "default": "Default (PyPI)",
+    "tsinghua": "Tsinghua (China)",
+    "aliyun": "Aliyun (China)",
 }
 
 # Dynamic requires-python based on framework (PyTorch CUDA wheels lack cp313)
@@ -45,8 +52,26 @@ CUDA_INDEX_MAP = {
     },
 }
 
+# Mirror configurations: default PyPI index replacement
+MIRROR_CONFIG: dict[MirrorSource, dict[str, str]] = {
+    "Default (PyPI)": {},
+    "Tsinghua (China)": {
+        "name": "tsinghua",
+        "url": "https://pypi.tuna.tsinghua.edu.cn/simple",
+    },
+    "Aliyun (China)": {
+        "name": "aliyun",
+        "url": "https://mirrors.aliyun.com/pypi/simple",
+    },
+}
 
-def generate_pyproject(project_name: str, framework: Framework, cuda: CudaVersion | None) -> str:
+
+def generate_pyproject(
+    project_name: str,
+    framework: Framework,
+    cuda: CudaVersion | None,
+    mirror: MirrorSource = "Default (PyPI)",
+) -> str:
     """Generate a pyproject.toml string based on user selections."""
 
     deps: list[str] = []
@@ -87,6 +112,14 @@ explicit = true""")
     requires_python = REQUIRES_PYTHON_MAP[framework]
     if framework == "PyTorch" and cuda == "CPU Only":
         requires_python = ">=3.10"
+
+    # Add mirror index (replaces default PyPI)
+    mirror_cfg = MIRROR_CONFIG[mirror]
+    if mirror_cfg:
+        index_sections.append(f"""[[tool.uv.index]]
+name = "{mirror_cfg['name']}"
+url = "{mirror_cfg['url']}"
+default = true""")
 
     deps_str = "\n".join(f'    "{d}",' for d in deps)
 

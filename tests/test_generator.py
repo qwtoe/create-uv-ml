@@ -3,6 +3,7 @@
 from create_uv_ml.generator import (
     CUDA_ALIASES,
     FRAMEWORK_ALIASES,
+    MIRROR_ALIASES,
     REQUIRES_PYTHON_MAP,
     generate_pyproject,
 )
@@ -78,6 +79,48 @@ class TestGeneratePyproject:
         assert 'version = "0.1.0"' in result
 
 
+class TestMirrorSource:
+    """Tests for mirror source configuration."""
+
+    def test_default_mirror_no_index(self) -> None:
+        result = generate_pyproject("my_proj", "PyTorch", "CPU Only", "Default (PyPI)")
+        assert "tsinghua" not in result
+        assert "aliyun" not in result
+        assert "default = true" not in result
+
+    def test_tsinghua_mirror(self) -> None:
+        result = generate_pyproject("my_proj", "PyTorch", "CPU Only", "Tsinghua (China)")
+        assert "tsinghua" in result
+        assert "https://pypi.tuna.tsinghua.edu.cn/simple" in result
+        assert "default = true" in result
+
+    def test_aliyun_mirror(self) -> None:
+        result = generate_pyproject("my_proj", "PyTorch", "CPU Only", "Aliyun (China)")
+        assert "aliyun" in result
+        assert "https://mirrors.aliyun.com/pypi/simple" in result
+        assert "default = true" in result
+
+    def test_mirror_with_pytorch_cuda(self) -> None:
+        result = generate_pyproject(
+            "my_proj", "PyTorch", "CUDA 12.1 (Recommended)", "Tsinghua (China)"
+        )
+        # Both PyTorch explicit index and Tsinghua default index should be present
+        assert "pytorch-cu121" in result
+        assert "explicit = true" in result
+        assert "tsinghua" in result
+        assert "default = true" in result
+
+    def test_mirror_with_scipy(self) -> None:
+        result = generate_pyproject(
+            "my_proj",
+            "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)",
+            None,
+            "Aliyun (China)",
+        )
+        assert "aliyun" in result
+        assert "default = true" in result
+
+
 class TestAliases:
     """Tests for alias mappings."""
 
@@ -92,6 +135,10 @@ class TestAliases:
     def test_cuda_aliases_cover_all_versions(self) -> None:
         for _alias, name in CUDA_ALIASES.items():
             assert name in ("CUDA 12.1 (Recommended)", "CUDA 11.8", "CPU Only")
+
+    def test_mirror_aliases_cover_all_mirrors(self) -> None:
+        for _alias, name in MIRROR_ALIASES.items():
+            assert name in ("Default (PyPI)", "Tsinghua (China)", "Aliyun (China)")
 
     def test_requires_python_map_covers_all_frameworks(self) -> None:
         for fw in (

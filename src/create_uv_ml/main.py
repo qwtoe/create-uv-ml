@@ -9,11 +9,13 @@ from rich.console import Console
 from create_uv_ml.generator import (
     CUDA_ALIASES,
     FRAMEWORK_ALIASES,
+    MIRROR_ALIASES,
     CudaVersion,
     Framework,
+    MirrorSource,
     generate_pyproject,
 )
-from create_uv_ml.prompts import ask_cuda_version, ask_framework
+from create_uv_ml.prompts import ask_cuda_version, ask_framework, ask_mirror
 from create_uv_ml.runner import check_uv_available, create_project, validate_project_name
 
 console = Console()
@@ -35,6 +37,12 @@ def main(
         "--cuda",
         "-c",
         help="CUDA version: cu121, cu118, or cpu (skips interactive prompt)",
+    ),
+    mirror: str | None = typer.Option(
+        None,
+        "--mirror",
+        "-m",
+        help="PyPI mirror: default, tsinghua, or aliyun (skips interactive prompt)",
     ),
     no_sync: bool = typer.Option(
         False,
@@ -98,16 +106,29 @@ def main(
         else:
             selected_cuda = ask_cuda_version()
 
+    # Resolve mirror source
+    if mirror:
+        if mirror not in MIRROR_ALIASES:
+            valid = ", ".join(MIRROR_ALIASES.keys())
+            console.print(f"[bold red]Error: --mirror must be one of: {valid}[/bold red]")
+            raise typer.Exit(1)
+        selected_mirror: MirrorSource = MIRROR_ALIASES[mirror]
+    else:
+        selected_mirror = ask_mirror()
+
     # Show configuration summary
     config_display = f"{selected_framework}"
     if selected_cuda:
         config_display += f" + {selected_cuda}"
+    config_display += f" | Mirror: {selected_mirror}"
     console.print(f"\n[cyan]⚙️  Configuration: {config_display}[/cyan]")
     console.print(f"[cyan]   Template: {template}[/cyan]\n")
 
     # Generate pyproject.toml
     console.print("[yellow]📝 Generating pyproject.toml...[/yellow]")
-    pyproject_content = generate_pyproject(project_name, selected_framework, selected_cuda)
+    pyproject_content = generate_pyproject(
+        project_name, selected_framework, selected_cuda, selected_mirror
+    )
 
     # Create project
     create_project(
