@@ -113,6 +113,7 @@ Next steps:
 | `--cuda` | `-c` | `cu121`, `cu118`, or `cpu` (skips interactive prompt) |
 | `--no-sync` | | Skip `uv sync` (only generate project files) |
 | `--template` | `-t` | `minimal` or `full` (default: `full`) |
+| `--version` | `-v` | Show the version number |
 
 ## Supported Frameworks
 
@@ -169,20 +170,16 @@ The generated `train.py` contains a complete, runnable training loop — just re
 
 ## FAQ
 
-```bash
-git clone https://github.com/slowcage/create-uv-ml.git
-cd create-uv-ml
-uv sync --group dev
-source .venv/bin/activate
+| Issue | Solution |
+|-------|----------|
+| `uv: command not found` | uv is not installed or not in PATH — reinstall uv following the Prerequisites section |
+| `Error: 'my-project' is not a valid Python package name` | Use only letters, digits, and underscores (e.g. `my_project`, not `my-project`) |
+| Dependency download is slow | PyTorch CUDA wheels are ~2 GB; use `--no-sync` to skip, then run `uv sync` manually later |
+| No NVIDIA GPU available | Select `CPU Only` when prompted, or use `--cuda cpu` — everything works, just slower training |
+| Want to generate files without installing packages | Add `--no-sync` to skip `uv sync` |
+| `uv sync` timed out | Re-run `uv sync` inside the project directory; large downloads may need retries |
 
-# Run tests
-uv run pytest -v
-
-# Lint
-uv run ruff check .
-```
-
-## Contributing
+## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 

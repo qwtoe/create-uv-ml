@@ -1,6 +1,7 @@
 """CLI entrypoint module."""
 
 import os
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -15,13 +16,14 @@ from create_uv_ml.generator import (
 from create_uv_ml.prompts import ask_cuda_version, ask_framework
 from create_uv_ml.runner import check_uv_available, create_project, validate_project_name
 
-app = typer.Typer()
 console = Console()
 
 
-@app.command()
-def create(
-    project_name: str = typer.Argument(..., help="Your deep learning project name"),
+def main(
+    project_name: Annotated[
+        str | None,
+        typer.Argument(help="Your deep learning project name"),
+    ] = None,
     framework: str | None = typer.Option(
         None,
         "--framework",
@@ -45,8 +47,26 @@ def create(
         "-t",
         help="Template style: minimal or full",
     ),
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-v",
+        help="Show the version number",
+    ),
 ) -> None:
     """Create a new uv-based deep learning project."""
+    if version:
+        from create_uv_ml import __version__
+
+        console.print(f"create-uv-ml v{__version__}")
+        raise typer.Exit()
+
+    if project_name is None:
+        console.print("[bold red]Error: Missing argument 'PROJECT_NAME'[/bold red]")
+        console.print("Usage: create-uv-ml PROJECT_NAME [OPTIONS]")
+        console.print("Try 'create-uv-ml --help' for more information.")
+        raise typer.Exit(1)
+
     # Validate prerequisites
     check_uv_available()
     validate_project_name(project_name)
@@ -119,12 +139,8 @@ def create(
         console.print(f"  [dim]{step}.[/dim] python src/{pkg_name}/{script}")
 
 
-@app.command()
-def version() -> None:
-    """Show the version number."""
-    from create_uv_ml import __version__
-
-    console.print(f"create-uv-ml v{__version__}")
+app = typer.Typer()
+app.command()(main)
 
 
 if __name__ == "__main__":
