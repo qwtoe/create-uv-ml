@@ -17,8 +17,6 @@ from create_uv_ml.templates import (
 
 console = Console()
 
-UV_SYNC_TIMEOUT = 600  # 10 minutes
-
 
 def check_uv_available() -> None:
     """Check that uv is installed and available in PATH."""
@@ -109,33 +107,31 @@ def create_project(
             console.print("[yellow]⏭️  Skipping uv sync (--no-sync flag)[/yellow]")
         else:
             console.print(
-                "[yellow]📦 Running uv sync to install dependencies "
-                "(this may take a few minutes)...[/yellow]"
+                "[yellow]📦 Running uv sync to install dependencies...[/yellow]"
+            )
+            console.print(
+                "[dim]   (PyTorch CUDA wheels are ~2 GB, this may take 10-30 minutes "
+                "depending on your network)[/dim]"
             )
             try:
-                result = subprocess.run(
+                process = subprocess.Popen(
                     ["uv", "sync"],
                     cwd=project_name,
-                    capture_output=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
                     text=True,
-                    check=True,
-                    timeout=UV_SYNC_TIMEOUT,
+                    bufsize=1,
                 )
-                if result.stdout:
-                    console.print(result.stdout)
+                # Stream uv sync output in real-time
+                if process.stdout is not None:
+                    for line in process.stdout:
+                        console.print(f"[dim]{line.rstrip()}[/dim]")
+                retcode = process.wait()
+                if retcode != 0:
+                    raise subprocess.CalledProcessError(retcode, "uv sync")
                 console.print("[green]  ✓ uv sync completed[/green]")
-            except subprocess.TimeoutExpired:
-                console.print(
-                    f"[bold red]✗ uv sync timed out after {UV_SYNC_TIMEOUT}s[/bold red]"
-                )
-                console.print(f"You can retry manually: cd {project_name} && uv sync")
-                sys.exit(1)
-            except subprocess.CalledProcessError as e:
-                console.print("[bold red]✗ uv sync failed:[/bold red]")
-                if e.stdout:
-                    console.print(e.stdout)
-                if e.stderr:
-                    console.print(e.stderr)
+            except subprocess.CalledProcessError:
+                console.print("[bold red]✗ uv sync failed[/bold red]")
                 _cleanup_on_failure(project_name)
                 sys.exit(1)
 

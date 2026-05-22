@@ -1,12 +1,27 @@
 """Tests for the runner module."""
 
 import os
-import subprocess
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from create_uv_ml.runner import check_uv_available, create_project, validate_project_name
+
+
+def _mock_popen_success() -> MagicMock:
+    """Create a mock Popen that simulates a successful uv sync."""
+    mock = MagicMock()
+    mock.stdout = iter(["Resolved 10 packages\n", "Installed 10 packages\n"])
+    mock.wait.return_value = 0
+    return mock
+
+
+def _mock_popen_failure() -> MagicMock:
+    """Create a mock Popen that simulates a failed uv sync."""
+    mock = MagicMock()
+    mock.stdout = iter(["error: something went wrong\n"])
+    mock.wait.return_value = 1
+    return mock
 
 
 class TestCheckUvAvailable:
@@ -64,7 +79,7 @@ class TestCreateProject:
         import pathlib
         tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
         project_dir = str(tmp / "new_proj")
-        with patch("create_uv_ml.runner.subprocess.run"):
+        with patch("create_uv_ml.runner.subprocess.Popen", return_value=_mock_popen_success()):
             create_project(
                 project_dir,
                 '[project]\nname = "new_proj"',
@@ -80,7 +95,7 @@ class TestCreateProject:
         import pathlib
         tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
         project_dir = str(tmp / "full_proj")
-        with patch("create_uv_ml.runner.subprocess.run"):
+        with patch("create_uv_ml.runner.subprocess.Popen", return_value=_mock_popen_success()):
             create_project(
                 project_dir,
                 '[project]\nname = "full_proj"',
@@ -96,7 +111,7 @@ class TestCreateProject:
         import pathlib
         tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
         project_dir = str(tmp / "nosync_proj")
-        with patch("create_uv_ml.runner.subprocess.run") as mock_run:
+        with patch("create_uv_ml.runner.subprocess.Popen") as mock_popen:
             create_project(
                 project_dir,
                 '[project]\nname = "nosync_proj"',
@@ -105,13 +120,18 @@ class TestCreateProject:
                 no_sync=True,
                 template="minimal",
             )
-            mock_run.assert_not_called()
+            mock_popen.assert_not_called()
 
     def test_uv_sync_called(self, tmp_path: object) -> None:
         import pathlib
         tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
         project_dir = str(tmp / "sync_proj")
-        with patch("create_uv_ml.runner.subprocess.run") as mock_run:
+        with (
+            patch(
+                "create_uv_ml.runner.subprocess.Popen",
+                return_value=_mock_popen_success(),
+            ) as mock_popen,
+        ):
             create_project(
                 project_dir,
                 '[project]\nname = "sync_proj"',
@@ -119,33 +139,19 @@ class TestCreateProject:
                 "CPU Only",
                 template="minimal",
             )
-            mock_run.assert_called_once()
-            call_args = mock_run.call_args
+            mock_popen.assert_called_once()
+            call_args = mock_popen.call_args
             assert call_args[0][0] == ["uv", "sync"]
             assert call_args[1]["cwd"] == project_dir
-
-    def test_uv_sync_timeout(self, tmp_path: object) -> None:
-        import pathlib
-        tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
-        project_dir = str(tmp / "timeout_proj")
-        with patch("create_uv_ml.runner.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.TimeoutExpired(cmd="uv sync", timeout=600)
-            with pytest.raises(SystemExit):
-                create_project(
-                    project_dir,
-                    '[project]\nname = "timeout_proj"',
-                    "PyTorch",
-                    "CPU Only",
-                    template="minimal",
-                )
 
     def test_uv_sync_failure(self, tmp_path: object) -> None:
         import pathlib
         tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
         project_dir = str(tmp / "fail_proj")
-        with patch("create_uv_ml.runner.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.CalledProcessError(1, "uv sync", stderr="error")
-            with pytest.raises(SystemExit):
+        with (
+            patch("create_uv_ml.runner.subprocess.Popen", return_value=_mock_popen_failure()),
+            pytest.raises(SystemExit),
+        ):
                 create_project(
                     project_dir,
                     '[project]\nname = "fail_proj"',
@@ -158,7 +164,7 @@ class TestCreateProject:
         import pathlib
         tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
         project_dir = str(tmp / "tf_proj")
-        with patch("create_uv_ml.runner.subprocess.run"):
+        with patch("create_uv_ml.runner.subprocess.Popen", return_value=_mock_popen_success()):
             create_project(
                 project_dir,
                 '[project]\nname = "tf_proj"',
@@ -172,7 +178,7 @@ class TestCreateProject:
         import pathlib
         tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
         project_dir = str(tmp / "scipy_proj")
-        with patch("create_uv_ml.runner.subprocess.run"):
+        with patch("create_uv_ml.runner.subprocess.Popen", return_value=_mock_popen_success()):
             create_project(
                 project_dir,
                 '[project]\nname = "scipy_proj"',
