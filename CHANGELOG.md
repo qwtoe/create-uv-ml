@@ -5,9 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-23
+
+### Changed
+
+- **Major redesign**: The tool is now an environment-only creator, no longer generates project scaffolding (no `train.py`, `data/`, `src/` layout)
+- Replaced `runner.py` with `executor.py`: writes `pyproject.toml` + `.gitignore`, runs `uv sync --python <ver>` then `uv add <extras>`
+- Replaced `templates.py` with no replacement: removed all project template generation
+- Rewrote `generator.py`: only produces torch+torchvision in `pyproject.toml`; extras installed via `uv add`
+- Rewrote `prompts.py`: new flow — target directory, Python version, CUDA strategy, extra packages checkbox, mirror
+- Rewrote `main.py`: five-phase pipeline (Detector → Prompts → Generator → Executor → Post-handoff)
+
+### Added
+
+- `detector.py`: auto-detect OS and NVIDIA GPU, recommend CUDA version based on driver
+- Python version selection (3.12, 3.11, 3.10, or custom)
+- Extra packages checkbox menu (transformers, pandas, jupyterlab, etc.)
+- Target directory prompt (current directory or custom path)
+- Platform-aware activation instructions (Linux vs Windows)
+
+### Removed
+
+- `--framework` CLI option (no longer framework-specific; always PyTorch)
+- `--cuda` CLI option (now interactive with auto-detection)
+- `--mirror` CLI option (now interactive)
+- `--no-sync` CLI option (sync always runs)
+- `--template` CLI option (no templates anymore)
+- `PROJECT_NAME` positional argument (now prompts for target directory)
+- TensorFlow and Scientific Computing framework options
+- Project scaffolding: `train.py`, `analysis.py`, `__init__.py`, `README.md`, `data/`
+
 ## [0.1.0] - 2026-05-21
 
 ### Added
+
 - Interactive CLI with Typer, Questionary, and Rich
 - PyTorch support with CUDA 12.1, CUDA 11.8, and CPU-only configurations
 - TensorFlow support with GPU (`tensorflow[and-cuda]`) and CPU variants
