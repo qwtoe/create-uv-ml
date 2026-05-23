@@ -11,6 +11,7 @@ from create_uv_ml.executor import (
     uv_sync,
     write_gitignore,
     write_pyproject,
+    write_verify_env,
 )
 
 
@@ -86,6 +87,24 @@ class TestWriteGitignore:
             content = f.read()
             assert "__pycache__/" in content
             assert ".venv/" in content
+
+
+class TestWriteVerifyEnv:
+    def test_creates_verify_env_script(self, tmp_path: object) -> None:
+        import pathlib
+
+        tmp = pathlib.Path(str(tmp_path))  # type: ignore[arg-type]
+        target = str(tmp / "proj")
+        os.makedirs(target, exist_ok=True)
+
+        write_verify_env(target)
+
+        script_path = os.path.join(target, "verify_env.py")
+        assert os.path.exists(script_path)
+        with open(script_path) as f:
+            content = f.read()
+            assert "Environment Verification" in content
+            assert "check_torch" in content
 
 
 class TestUvSync:

@@ -21,6 +21,7 @@ from create_uv_ml.executor import (
     uv_sync,
     write_gitignore,
     write_pyproject,
+    write_verify_env,
 )
 from create_uv_ml.generator import generate_pyproject
 from create_uv_ml.prompts import (
@@ -89,6 +90,7 @@ def main(
     pyproject_content = generate_pyproject(project_name, python_version, cuda, mirror)
     write_pyproject(target_dir, pyproject_content)
     write_gitignore(target_dir)
+    write_verify_env(target_dir)
 
     # ── Phase 4: Executor ───────────────────────────────────────────
     check_uv_available()
@@ -102,7 +104,8 @@ def main(
         console.print(f"  [dim]1.[/dim] {target_dir}\\.venv\\Scripts\\activate")
     else:
         console.print(f"  [dim]1.[/dim] source {target_dir}/.venv/bin/activate")
-    console.print("  [dim]2.[/dim] Start coding! Create .py files or Jupyter notebooks.")
+    console.print("  [dim]2.[/dim] python verify_env.py    # Verify CUDA, torch, and packages")
+    console.print("  [dim]3.[/dim] Start coding! Create .py files or Jupyter notebooks.")
 
 
 app = typer.Typer()
