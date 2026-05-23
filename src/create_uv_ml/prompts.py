@@ -148,14 +148,40 @@ def ask_cuda_strategy(recommended: str | None = None) -> CudaVersion | None:
     return cast(CudaVersion, result)
 
 
+def _expand_all_selections(selected: list[str]) -> list[str]:
+    """Expand '[All] ...' selections into individual packages."""
+    if "[All] Install all packages" in selected:
+        all_packages: list[str] = []
+        for pkgs in EXTRA_PACKAGES.values():
+            all_packages.extend(pkgs)
+        return all_packages
+
+    result: set[str] = set()
+    for item in selected:
+        if item.startswith("[All] "):
+            category = item[6:]  # strip "[All] " prefix
+            if category in EXTRA_PACKAGES:
+                result.update(EXTRA_PACKAGES[category])
+        else:
+            result.add(item)
+
+    return sorted(result)
+
+
 def ask_extra_packages() -> list[str]:
     """Ask the user to select additional packages via a checkbox prompt.
 
-    Packages are grouped by category with separator headers.
+    Each category has an ``[All] <Category>`` shortcut that expands to
+    every package in that category.  A global ``[All] Install all
+    packages`` shortcut is also provided at the top.
     """
     choices: list[str | Separator] = []
+    choices.append("[All] Install all packages")
+    choices.append(Separator("=" * 30))
+
     for category, packages in EXTRA_PACKAGES.items():
         choices.append(Separator(f"--- {category} ---"))
+        choices.append(f"[All] {category}")
         choices.extend(packages)
 
     result = questionary.checkbox(
@@ -166,7 +192,7 @@ def ask_extra_packages() -> list[str]:
     if result is None:
         return []
 
-    return list(result)
+    return _expand_all_selections(list(result))
 
 
 def ask_mirror() -> MirrorSource:

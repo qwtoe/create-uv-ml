@@ -5,6 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from create_uv_ml.prompts import (
+    EXTRA_PACKAGES,
+    _expand_all_selections,
     ask_cuda_strategy,
     ask_extra_packages,
     ask_mirror,
@@ -65,18 +67,71 @@ class TestAskCudaStrategy:
             assert choices[0] == "CUDA 11.8"
 
 
+class TestExpandAllSelections:
+    """Direct tests for the _expand_all_selections helper."""
+
+    def test_empty_list(self) -> None:
+        assert _expand_all_selections([]) == []
+
+    def test_individual_packages_passthrough(self) -> None:
+        assert _expand_all_selections(["pandas", "matplotlib"]) == ["matplotlib", "pandas"]
+
+    def test_category_all_expands(self) -> None:
+        result = _expand_all_selections(["[All] Utilities"])
+        assert "tqdm" in result
+        assert "rich" in result
+        assert "[All] Utilities" not in result
+
+    def test_global_all_expands_everything(self) -> None:
+        result = _expand_all_selections(["[All] Install all packages"])
+        for pkgs in EXTRA_PACKAGES.values():
+            for pkg in pkgs:
+                assert pkg in result
+        assert "[All] Install all packages" not in result
+
+    def test_mixed_all_and_individual(self) -> None:
+        result = _expand_all_selections(["[All] Deep Learning", "pandas"])
+        assert "transformers" in result
+        assert "datasets" in result
+        assert "pandas" in result
+        # No duplicates
+        assert len(result) == len(set(result))
+
+    def test_global_all_takes_precedence(self) -> None:
+        result = _expand_all_selections(["[All] Install all packages", "pandas"])
+        for pkgs in EXTRA_PACKAGES.values():
+            for pkg in pkgs:
+                assert pkg in result
+
+
 class TestAskExtraPackages:
     def test_returns_selected_packages(self) -> None:
         with patch("create_uv_ml.prompts.questionary.checkbox") as mock_checkbox:
             mock_checkbox.return_value.ask.return_value = ["pandas", "matplotlib"]
             result = ask_extra_packages()
-            assert result == ["pandas", "matplotlib"]
+            assert result == ["matplotlib", "pandas"]
 
     def test_returns_empty_on_cancel(self) -> None:
         with patch("create_uv_ml.prompts.questionary.checkbox") as mock_checkbox:
             mock_checkbox.return_value.ask.return_value = None
             result = ask_extra_packages()
             assert result == []
+
+    def test_category_all_expanded_in_result(self) -> None:
+        with patch("create_uv_ml.prompts.questionary.checkbox") as mock_checkbox:
+            mock_checkbox.return_value.ask.return_value = ["[All] Utilities"]
+            result = ask_extra_packages()
+            assert "tqdm" in result
+            assert "rich" in result
+            assert "[All] Utilities" not in result
+
+    def test_global_all_expanded_in_result(self) -> None:
+        with patch("create_uv_ml.prompts.questionary.checkbox") as mock_checkbox:
+            mock_checkbox.return_value.ask.return_value = ["[All] Install all packages"]
+            result = ask_extra_packages()
+            assert "transformers" in result
+            assert "pandas" in result
+            assert "[All] Install all packages" not in result
 
 
 class TestAskMirror:
