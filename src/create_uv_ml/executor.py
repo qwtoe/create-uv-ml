@@ -113,14 +113,24 @@ def check_cuda() -> None:
                 print(f"  {line}")
             _print_ok("nvidia-smi is accessible")
         else:
-            err = result.stderr.strip()
+            # nvidia-smi may write errors to stdout or stderr
+            err = (result.stderr.strip() or result.stdout.strip())
             _print_fail("nvidia-smi returned an error")
             if err:
                 print(f"       {err}")
             if "Driver/library version mismatch" in err:
-                print("       → Try rebooting, or reinstall the NVIDIA driver.")
+                print("       → Cause: NVIDIA kernel module and user library versions differ")
+                print("       → Fix 1: sudo reboot")
+                print(
+                    "       → Fix 2: sudo apt purge nvidia-* && sudo reboot,"
+                    " then reinstall driver"
+                )
             elif "Failed to initialize NVML" in err:
-                print("       → NVIDIA driver may be missing or corrupted.")
+                print("       → Cause: NVIDIA driver not loaded or corrupted")
+                print("       → Fix: Reinstall the NVIDIA driver for your GPU")
+            elif "command not found" in err.lower():
+                print("       → Cause: nvidia-smi not installed")
+                print("       → Fix: Install NVIDIA driver from https://www.nvidia.com/Download/")
     except FileNotFoundError:
         _print_warn("nvidia-smi not found — no NVIDIA GPU or driver not installed")
     except subprocess.TimeoutExpired:
