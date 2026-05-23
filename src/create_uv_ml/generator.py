@@ -1,23 +1,18 @@
-"""Generator module that produces pyproject.toml content based on user choices."""
+"""Generator module that produces pyproject.toml content based on user choices.
+
+Phase 3 of the pipeline: takes collected configuration and assembles a
+conflict-free pyproject.toml. Only core dependencies (torch, torchvision)
+are written into the file; extras are installed later via ``uv add``
+so that uv's resolver can solve them against the already-locked base.
+"""
 
 import os
 from typing import Literal
 
-Framework = Literal[
-    "PyTorch",
-    "TensorFlow",
-    "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)",
-]
 CudaVersion = Literal["CUDA 12.1 (Recommended)", "CUDA 11.8", "CPU Only"]
 MirrorSource = Literal["Default (PyPI)", "Tsinghua (China)", "Aliyun (China)"]
 
-# Short-name aliases for CLI --framework, --cuda, and --mirror options
-FRAMEWORK_ALIASES: dict[str, Framework] = {
-    "pytorch": "PyTorch",
-    "tensorflow": "TensorFlow",
-    "scipy": "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)",
-}
-
+# Short-name aliases for CLI --cuda and --mirror options
 CUDA_ALIASES: dict[str, CudaVersion] = {
     "cu121": "CUDA 12.1 (Recommended)",
     "cu118": "CUDA 11.8",
@@ -30,14 +25,7 @@ MIRROR_ALIASES: dict[str, MirrorSource] = {
     "aliyun": "Aliyun (China)",
 }
 
-# Dynamic requires-python based on framework (PyTorch CUDA wheels lack cp313)
-REQUIRES_PYTHON_MAP: dict[Framework, str] = {
-    "PyTorch": ">=3.10,<3.13",
-    "TensorFlow": ">=3.10",
-    "Basic Scientific Computing (NumPy/Pandas/Scikit-learn)": ">=3.10",
-}
-
-CUDA_INDEX_MAP = {
+CUDA_INDEX_MAP: dict[CudaVersion, dict[str, str]] = {
     "CUDA 12.1 (Recommended)": {
         "name": "pytorch-cu121",
         "url": "https://download.pytorch.org/whl/cu121",
@@ -52,7 +40,6 @@ CUDA_INDEX_MAP = {
     },
 }
 
-# Mirror configurations: default PyPI index replacement
 MIRROR_CONFIG: dict[MirrorSource, dict[str, str]] = {
     "Default (PyPI)": {},
     "Tsinghua (China)": {
@@ -68,77 +55,63 @@ MIRROR_CONFIG: dict[MirrorSource, dict[str, str]] = {
 
 def generate_pyproject(
     project_name: str,
-    framework: Framework,
+    python_version: str,
     cuda: CudaVersion | None,
     mirror: MirrorSource = "Default (PyPI)",
 ) -> str:
-    """Generate a pyproject.toml string based on user selections."""
+    """Generate a pyproject.toml string based on user selections.
 
-    deps: list[str] = []
+    Core dependencies (torch, torchvision) are written into the file so
+    that ``uv sync`` can lock them first.  Additional packages should be
+    installed afterwards via ``uv add`` for best dependency resolution.
+    """
+    deps: list[str] = ["torch>=2.3.0", "torchvision>=0.18.0"]
     index_sections: list[str] = []
     sources_sections: list[str] = []
 
-    if framework == "PyTorch":
-        deps.extend(["torch>=2.3.0", "torchvision>=0.18.0", "torchaudio>=2.3.0"])
+    # PyTorch CUDA index configuration
+    if cuda:
+        idx = CUDA_INDEX_MAP[cuda]
+        index_sections.append(
+            f'[[tool.uv.index]]\nname = "{idx["name"]}"\nurl = "{idx["url"]}"\nexplicit = true'
+        )
 
-        if cuda:
-            idx = CUDA_INDEX_MAP[cuda]
-            index_sections.append(f"""[[tool.uv.index]]
-name = "{idx['name']}"
-url = "{idx['url']}"
-explicit = true""")
+        marker = "marker = \"sys_platform == 'linux' or sys_platform == 'win32'\""
+        for pkg in ("torch", "torchvision"):
+            if cuda == "CPU Only":
+                sources_sections.append(f'{pkg} = [{{ index = "{idx["name"]}" }}]')
+            else:
+                sources_sections.append(f'{pkg} = [{{ index = "{idx["name"]}", {marker} }}]')
 
-            marker = 'marker = "sys_platform == \'linux\' or sys_platform == \'win32\'"'
-            for pkg in ("torch", "torchvision", "torchaudio"):
-                if cuda == "CPU Only":
-                    sources_sections.append(f'{pkg} = [{{ index = "{idx["name"]}" }}]')
-                else:
-                    sources_sections.append(f'{pkg} = [{{ index = "{idx["name"]}", {marker} }}]')
-
-    elif framework == "TensorFlow":
-        if cuda and cuda != "CPU Only":
-            deps.append("tensorflow[and-cuda]>=2.16.0")
-        else:
-            deps.append("tensorflow>=2.16.0")
-    else:
-        deps.extend([
-            "numpy>=1.26.0",
-            "pandas>=2.2.0",
-            "matplotlib>=3.8.0",
-            "scikit-learn>=1.4.0",
-        ])
-
-    # Dynamic requires-python: relax upper bound for PyTorch CPU-only
-    requires_python = REQUIRES_PYTHON_MAP[framework]
-    if framework == "PyTorch" and cuda == "CPU Only":
-        requires_python = ">=3.10"
-
-    # Add mirror index (replaces default PyPI)
+    # Mirror configuration (replaces default PyPI)
     mirror_cfg = MIRROR_CONFIG[mirror]
     if mirror_cfg:
-        index_sections.append(f"""[[tool.uv.index]]
-name = "{mirror_cfg['name']}"
-url = "{mirror_cfg['url']}"
-default = true""")
+        index_sections.append(
+            f'[[tool.uv.index]]\nname = "{mirror_cfg["name"]}"\n'
+            f'url = "{mirror_cfg["url"]}"\ndefault = true'
+        )
+
+    # PyTorch CUDA wheels lack cp313, so cap at <3.13 for CUDA
+    requires_python = ">=3.10,<3.13" if cuda and cuda != "CPU Only" else ">=3.10"
 
     deps_str = "\n".join(f'    "{d}",' for d in deps)
 
-    toml = f"""[project]
-name = "{os.path.basename(project_name)}"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = "{requires_python}"
-dependencies = [
-{deps_str}
-]
-"""
+    toml = (
+        f"[project]\n"
+        f'name = "{os.path.basename(project_name)}"\n'
+        f'version = "0.1.0"\n'
+        f'description = "Add your description here"\n'
+        f'readme = "README.md"\n'
+        f'requires-python = "{requires_python}"\n'
+        f"dependencies = [\n"
+        f"{deps_str}\n"
+        f"]\n"
+    )
 
     if index_sections:
         toml += "\n" + "\n\n".join(index_sections) + "\n"
 
     if sources_sections:
-        toml += "\n[tool.uv.sources]\n"
-        toml += "\n".join(sources_sections) + "\n"
+        toml += "\n[tool.uv.sources]\n" + "\n".join(sources_sections) + "\n"
 
     return toml

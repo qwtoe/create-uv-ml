@@ -1,3 +1,3 @@
-"""create-uv-ml: 一个用于快速初始化深度学习项目的 uv 脚手架工具."""
+"""create-uv-ml: A CLI tool for quickly setting up uv-based deep learning environments."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
