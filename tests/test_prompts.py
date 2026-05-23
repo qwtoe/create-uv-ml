@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from create_uv_ml.prompts import (
     ask_cuda_strategy,
     ask_extra_packages,
@@ -96,6 +98,7 @@ class TestAskTargetDirectory:
         with (
             patch("create_uv_ml.prompts.questionary.confirm") as mock_confirm,
             patch("create_uv_ml.prompts.os.getcwd", return_value="/home/user/project"),
+            patch("create_uv_ml.prompts.os.path.isdir", return_value=False),
         ):
             mock_confirm.return_value.ask.return_value = True
             result = ask_target_directory()
@@ -114,8 +117,33 @@ class TestAskTargetDirectory:
                 "create_uv_ml.prompts.os.path.abspath",
                 return_value="/home/user/my_project",
             ),
+            patch("create_uv_ml.prompts.os.path.isdir", return_value=False),
         ):
             mock_confirm.return_value.ask.return_value = False
             mock_text.return_value.ask.return_value = "~/my_project"
             result = ask_target_directory()
             assert result == "/home/user/my_project"
+
+    def test_venv_exists_user_confirms(self) -> None:
+        with (
+            patch("create_uv_ml.prompts.questionary.confirm") as mock_confirm,
+            patch("create_uv_ml.prompts.os.getcwd", return_value="/home/user/project"),
+            patch("create_uv_ml.prompts.os.path.isdir", return_value=True),
+        ):
+            # First confirm: use CWD = True
+            # Second confirm: proceed despite .venv = True
+            mock_confirm.return_value.ask.side_effect = [True, True]
+            result = ask_target_directory()
+            assert result == "/home/user/project"
+
+    def test_venv_exists_user_declines(self) -> None:
+        with (
+            patch("create_uv_ml.prompts.questionary.confirm") as mock_confirm,
+            patch("create_uv_ml.prompts.os.getcwd", return_value="/home/user/project"),
+            patch("create_uv_ml.prompts.os.path.isdir", return_value=True),
+        ):
+            # First confirm: use CWD = True
+            # Second confirm: proceed despite .venv = False
+            mock_confirm.return_value.ask.side_effect = [True, False]
+            with pytest.raises(SystemExit):
+                ask_target_directory()

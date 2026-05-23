@@ -53,6 +53,9 @@ def ask_target_directory() -> str:
     Offers the current working directory as default; if the user declines,
     prompts for a custom path.  Performs path cleaning (``~`` expansion,
     relative→absolute resolution).
+
+    If the chosen directory already contains a ``.venv``, the user is
+    warned and must confirm before proceeding.
     """
     cwd = os.getcwd()
     use_cwd = questionary.confirm(
@@ -61,22 +64,32 @@ def ask_target_directory() -> str:
     ).ask()
 
     if use_cwd is None:
-        # User pressed Ctrl+C / Esc
         raise SystemExit(1)
 
-    if use_cwd:
-        return cwd
+    target = cwd if use_cwd else None
 
-    custom_path = questionary.text(
-        "Enter target directory path:",
-    ).ask()
+    if target is None:
+        custom_path = questionary.text(
+            "Enter target directory path:",
+        ).ask()
 
-    if custom_path is None:
-        raise SystemExit(1)
+        if custom_path is None:
+            raise SystemExit(1)
 
-    # Expand ~ and resolve to absolute path
-    resolved: str = os.path.abspath(os.path.expanduser(custom_path.strip()))
-    return resolved
+        target = os.path.abspath(os.path.expanduser(custom_path.strip()))
+
+    # Warn if .venv already exists in the target directory
+    venv_path = os.path.join(target, ".venv")
+    if os.path.isdir(venv_path):
+        proceed = questionary.confirm(
+            f"⚠️  A .venv already exists at {venv_path}. It will be reused by uv sync. Continue?",
+            default=False,
+        ).ask()
+
+        if proceed is None or not proceed:
+            raise SystemExit(1)
+
+    return target
 
 
 def ask_python_version() -> str:
