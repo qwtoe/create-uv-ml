@@ -14,7 +14,7 @@ import sys
 import typer
 from rich.console import Console
 
-from create_uv_ml.detector import detect
+from create_uv_ml.detector import detect, find_nvidia_smi
 from create_uv_ml.executor import (
     check_uv_available,
     uv_add,
@@ -59,6 +59,11 @@ def main(
         cuda_info = f"Recommended: {detection.recommended_cuda}"
         console.print(f"[green]  ✓ {gpu_info}[/green]")
         console.print(f"[green]  ✓ {cuda_info}[/green]")
+    elif find_nvidia_smi():
+        # nvidia-smi exists but detect() says no GPU → driver is broken
+        console.print("[yellow]  ⚠ NVIDIA driver appears broken (nvidia-smi failed)[/yellow]")
+        console.print("[yellow]    Try rebooting or reinstalling the NVIDIA driver.[/yellow]")
+        console.print("[yellow]    Falling back to CPU-only mode.[/yellow]")
     else:
         console.print("[yellow]  ℹ No NVIDIA GPU detected[/yellow]")
 

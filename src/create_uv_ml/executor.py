@@ -113,7 +113,14 @@ def check_cuda() -> None:
                 print(f"  {line}")
             _print_ok("nvidia-smi is accessible")
         else:
+            err = result.stderr.strip()
             _print_fail("nvidia-smi returned an error")
+            if err:
+                print(f"       {err}")
+            if "Driver/library version mismatch" in err:
+                print("       → Try rebooting, or reinstall the NVIDIA driver.")
+            elif "Failed to initialize NVML" in err:
+                print("       → NVIDIA driver may be missing or corrupted.")
     except FileNotFoundError:
         _print_warn("nvidia-smi not found — no NVIDIA GPU or driver not installed")
     except subprocess.TimeoutExpired:
@@ -170,6 +177,11 @@ def _try_import(module_name: str, display_name: str | None = None) -> bool:
         return True
     except ImportError:
         _print_warn(f"{name} is not installed")
+        return False
+    except OSError as exc:
+        # Some packages (e.g. torchaudio with CUDA extensions) may fail
+        # to load native libraries even though the Python package is present.
+        _print_fail(f"{name} import failed: {exc}")
         return False
 
 

@@ -62,6 +62,10 @@ def detect_nvidia_gpu() -> tuple[bool, str | None]:
     Uses nvidia-smi to query the driver version. Returns (True, version)
     if a GPU is found, (True, None) if nvidia-smi exists but version
     cannot be determined, and (False, None) if no NVIDIA setup is found.
+
+    If nvidia-smi exists but fails with a driver-level error (e.g.
+    "Driver/library version mismatch"), returns (False, None) because
+    the GPU is effectively unusable.
     """
     nvidia_smi = find_nvidia_smi()
     if not nvidia_smi:
@@ -77,10 +81,15 @@ def detect_nvidia_gpu() -> tuple[bool, str | None]:
         if result.returncode == 0 and result.stdout.strip():
             version = result.stdout.strip().split("\n")[0].strip()
             return True, version
+
+        # nvidia-smi returned an error — check if it's a driver-level failure
+        stderr = result.stderr.lower()
+        if "driver/library version mismatch" in stderr or "failed to initialize nvml" in stderr:
+            return False, None
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
 
-    # nvidia-smi exists but couldn't get version
+    # nvidia-smi exists but couldn't get version (non-fatal)
     return True, None
 
 
