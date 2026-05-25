@@ -130,6 +130,12 @@ def main(
 
     # ── Phase 3: Generator ──────────────────────────────────────────
     console.print("[yellow]📝 Generating pyproject.toml...[/yellow]")
+
+    # Create target directory if it doesn't exist
+    if not os.path.isdir(target_dir):
+        os.makedirs(target_dir, exist_ok=True)
+        console.print(f"[green]  ✓ Created directory: {target_dir}[/green]")
+
     project_name = os.path.basename(target_dir)
     pyproject_content = generate_pyproject(project_name, python_version, cuda, mirror)
     write_pyproject(target_dir, pyproject_content)
@@ -138,18 +144,64 @@ def main(
 
     # ── Phase 4: Executor ───────────────────────────────────────────
     check_uv_available()
-    uv_sync(target_dir, python_version)
-    uv_add(target_dir, extras)
+
+    do_sync = questionary.confirm(
+        "Install core dependencies (torch, torchvision) now?",
+        default=True,
+    ).ask()
+
+    if do_sync is None:
+        raise typer.Exit()
+
+    if do_sync:
+        uv_sync(target_dir, python_version)
+
+        if extras:
+            do_add = questionary.confirm(
+                f"Install extra packages ({', '.join(extras)}) now?",
+                default=True,
+            ).ask()
+
+            if do_add is None:
+                raise typer.Exit()
+
+            if do_add:
+                uv_add(target_dir, extras)
+            else:
+                console.print("[yellow]  ℹ Extra packages skipped.[/yellow]")
+                console.print(
+                    f"[dim]     Run later: cd {target_dir}"
+                    f" && source .venv/bin/activate"
+                    f" && uv add {' '.join(extras)}[/dim]"
+                )
+    else:
+        console.print(
+            "[yellow]  ⚠ Core dependencies skipped"
+            " — extra packages also skipped.[/yellow]"
+        )
+        console.print(
+            f"[dim]     Run later: cd {target_dir} && uv sync[/dim]"
+        )
+        if extras:
+            console.print(
+                f"[dim]              uv add {' '.join(extras)}[/dim]"
+            )
+        console.print("[dim]     (uv sync must run first, then uv add)[/dim]")
 
     # ── Phase 5: Post-handoff ───────────────────────────────────────
     console.print("\n[bold green]✅ Environment created successfully![/bold green]")
     console.print("\n[bold]Next steps:[/bold]")
+
+    steps: list[str] = []
     if sys.platform == "win32":
-        console.print(f"  [dim]1.[/dim] {target_dir}\\.venv\\Scripts\\activate")
+        steps.append(f"{target_dir}\\.venv\\Scripts\\activate")
     else:
-        console.print(f"  [dim]1.[/dim] source {target_dir}/.venv/bin/activate")
-    console.print("  [dim]2.[/dim] python verify_env.py    # Verify CUDA, torch, and packages")
-    console.print("  [dim]3.[/dim] Start coding! Create .py files or Jupyter notebooks.")
+        steps.append(f"source {target_dir}/.venv/bin/activate")
+    steps.append("python verify_env.py    # Verify CUDA, torch, and packages")
+    steps.append("Start coding! Create .py files or Jupyter notebooks.")
+
+    for i, step in enumerate(steps, 1):
+        console.print(f"  [dim]{i}.[/dim] {step}")
 
 
 app = typer.Typer()
