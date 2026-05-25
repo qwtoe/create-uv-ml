@@ -10,14 +10,13 @@ import sys
 from typing import cast
 
 import questionary
-from questionary import Separator
 
 from create_uv_ml.generator import CUDA_ALIASES, MIRROR_ALIASES, CudaVersion, MirrorSource
 
 # Stable Python versions offered to the user (most recent first)
 PYTHON_VERSIONS = ["3.12", "3.11", "3.10"]
 
-# Extra packages organised by category for the checkbox prompt
+# Extra packages organised by category
 EXTRA_PACKAGES: dict[str, list[str]] = {
     "Deep Learning": [
         "transformers",
@@ -44,6 +43,34 @@ EXTRA_PACKAGES: dict[str, list[str]] = {
         "requests",
         "pydantic",
     ],
+}
+
+_ALL_PACKAGES: list[str] = [pkg for pkgs in EXTRA_PACKAGES.values() for pkg in pkgs]
+
+_ML_RESEARCH_PACKAGES: list[str] = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "scipy",
+    "jupyterlab",
+]
+
+_DL_PACKAGES: list[str] = [
+    "transformers",
+    "datasets",
+    "accelerate",
+    "tensorboard",
+    "torchaudio",
+]
+
+# Presets for the first-stage select prompt
+PRESETS: dict[str, list[str]] = {
+    "None (core PyTorch only)": [],
+    f"All packages ({len(_ALL_PACKAGES)} packages)": _ALL_PACKAGES,
+    f"ML Research ({', '.join(_ML_RESEARCH_PACKAGES)})": _ML_RESEARCH_PACKAGES,
+    f"Deep Learning ({', '.join(_DL_PACKAGES)})": _DL_PACKAGES,
+    "Customize... (pick per category)": [],
 }
 
 
@@ -148,51 +175,45 @@ def ask_cuda_strategy(recommended: str | None = None) -> CudaVersion | None:
     return cast(CudaVersion, result)
 
 
-def _expand_all_selections(selected: list[str]) -> list[str]:
-    """Expand '[All] ...' selections into individual packages."""
-    if "[All] Install all packages" in selected:
-        all_packages: list[str] = []
-        for pkgs in EXTRA_PACKAGES.values():
-            all_packages.extend(pkgs)
-        return all_packages
-
-    result: set[str] = set()
-    for item in selected:
-        if item.startswith("[All] "):
-            category = item[6:]  # strip "[All] " prefix
-            if category in EXTRA_PACKAGES:
-                result.update(EXTRA_PACKAGES[category])
-        else:
-            result.add(item)
-
-    return sorted(result)
-
-
 def ask_extra_packages() -> list[str]:
-    """Ask the user to select additional packages via a checkbox prompt.
+    """Ask the user to select additional packages.
 
-    Each category has an ``[All] <Category>`` shortcut that expands to
-    every package in that category.  A global ``[All] Install all
-    packages`` shortcut is also provided at the top.
+    Two-stage design for consistent ENTER-only navigation:
+
+    Stage 1 — preset selection (``select``):
+        Choose from None, All, ML Research, Deep Learning, or Customize.
+
+    Stage 2 — category confirmation (``confirm``):
+        Only triggered when "Customize" is chosen.  Confirms each of the
+        four categories one by one.
     """
-    choices: list[str | Separator] = []
-    choices.append("[All] Install all packages")
-    choices.append(Separator("=" * 30))
+    _CUSTOMIZE_KEY = "Customize... (pick per category)"
 
-    for category, packages in EXTRA_PACKAGES.items():
-        choices.append(Separator(f"--- {category} ---"))
-        choices.append(f"[All] {category}")
-        choices.extend(packages)
-
-    result = questionary.checkbox(
-        "Select additional packages (space to toggle, enter to confirm):",
-        choices=choices,
+    result = questionary.select(
+        "Select additional packages:",
+        choices=list(PRESETS.keys()),
     ).ask()
 
     if result is None:
-        return []
+        raise SystemExit(1)
 
-    return _expand_all_selections(list(result))
+    if result != _CUSTOMIZE_KEY:
+        return PRESETS[result]
+
+    # Stage 2: per-category confirmation
+    selected: list[str] = []
+    for category, packages in EXTRA_PACKAGES.items():
+        pkg_list = ", ".join(packages)
+        install = questionary.confirm(
+            f"Install {category} packages? ({pkg_list})",
+            default=False,
+        ).ask()
+        if install is None:
+            raise SystemExit(1)
+        if install:
+            selected.extend(packages)
+
+    return selected
 
 
 def ask_mirror() -> MirrorSource:
