@@ -11,6 +11,7 @@ Orchestrates the five-phase pipeline:
 import os
 import sys
 
+import questionary
 import typer
 from rich.console import Console
 
@@ -70,24 +71,62 @@ def main(
     # ── Phase 2: Interactive prompts ────────────────────────────────
     console.print("\n[bold]📋 Configuration[/bold]")
 
-    target_dir = ask_target_directory()
-    python_version = ask_python_version()
-    cuda = ask_cuda_strategy(
-        recommended=detection.recommended_cuda if detection.has_nvidia else None,
-    )
-    extras = ask_extra_packages()
-    mirror = ask_mirror()
+    target_dir: str = ""
+    python_version: str = ""
+    cuda: str | None = None
+    extras: list[str] = []
+    mirror: str = "Default (PyPI)"
 
-    # ── Configuration summary ───────────────────────────────────────
-    config_parts = [f"Python {python_version}"]
-    if cuda:
-        config_parts.append(str(cuda))
-    config_parts.append(f"Mirror: {mirror}")
-    if extras:
-        config_parts.append(f"Extras: {len(extras)} packages")
+    _RECOMMENDED = detection.recommended_cuda if detection.has_nvidia else None
 
-    console.print(f"\n[cyan]⚙️  Configuration: {' | '.join(config_parts)}[/cyan]")
-    console.print(f"[cyan]   Target: {target_dir}[/cyan]\n")
+    while True:
+        target_dir = ask_target_directory()
+        python_version = ask_python_version()
+        cuda = ask_cuda_strategy(recommended=_RECOMMENDED)
+        extras = ask_extra_packages()
+        mirror = ask_mirror()
+
+        # ── Configuration summary ───────────────────────────────────
+        config_parts = [f"Python {python_version}"]
+        if cuda:
+            config_parts.append(str(cuda))
+        config_parts.append(f"Mirror: {mirror}")
+        if extras:
+            config_parts.append(f"Extras: {len(extras)} packages")
+
+        console.print(f"\n[cyan]⚙️  Configuration: {' | '.join(config_parts)}[/cyan]")
+        console.print(f"[cyan]   Target: {target_dir}[/cyan]\n")
+
+        action = questionary.select(
+            "What would you like to do?",
+            choices=[
+                "Continue (create environment)",
+                "Change target directory",
+                "Change Python version",
+                "Change CUDA strategy",
+                "Change extra packages",
+                "Change mirror",
+            ],
+        ).ask()
+
+        if action is None:
+            raise typer.Exit()
+
+        if action.startswith("Continue"):
+            break
+
+        # Re-ask only the selected step, then loop back to review
+        console.print(f"\n[dim]── Revising: {action} ──[/dim]")
+        if action == "Change target directory":
+            target_dir = ask_target_directory()
+        elif action == "Change Python version":
+            python_version = ask_python_version()
+        elif action == "Change CUDA strategy":
+            cuda = ask_cuda_strategy(recommended=_RECOMMENDED)
+        elif action == "Change extra packages":
+            extras = ask_extra_packages()
+        elif action == "Change mirror":
+            mirror = ask_mirror()
 
     # ── Phase 3: Generator ──────────────────────────────────────────
     console.print("[yellow]📝 Generating pyproject.toml...[/yellow]")
