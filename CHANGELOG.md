@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Review loop**: After all configuration prompts, a summary is shown with the option to "Continue" or redo any specific step (target directory, Python version, CUDA strategy, extra packages, mirror).
+- **Skippable installs**: `uv sync` and `uv add` each have a confirm prompt. If `uv sync` is skipped, `uv add` is automatically skipped with a warning and manual commands are printed.
+- **Auto-create directory**: If the specified target directory doesn't exist, it is created automatically with a confirmation message.
+- **`verify_env.py`**: Generated in the target directory to verify CUDA, PyTorch, and all installed packages. Handles driver errors gracefully (captures both stdout/stderr, catches OSError for broken native libs).
+- **Broken driver detection**: Detector now recognizes "Driver/library version mismatch" and "Failed to initialize NVML" errors from nvidia-smi and marks GPU as unavailable.
+
+### Changed
+
+- **Extra packages** redesigned as two-stage flow: Stage 1 picks a preset (None / All / ML Research / Deep Learning / Customize), Stage 2 (only on Customize) confirms each category individually. All ENTER-based, no SPACE toggles.
+- `.gitignore` template now includes `verify_env.py` exclusion.
+- **`nvidia-smi` error capture**: `verify_env.py` now inspects both stdout and stderr and prints targeted fix suggestions.
+
 ## [0.2.0] - 2026-05-23
 
 ### Changed
@@ -20,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `detector.py`: auto-detect OS and NVIDIA GPU, recommend CUDA version based on driver
 - Python version selection (3.12, 3.11, 3.10, or custom)
-- Extra packages checkbox menu (transformers, pandas, jupyterlab, etc.)
+- Extra packages menu (transformers, pandas, jupyterlab, etc.)
 - Target directory prompt (current directory or custom path)
 - Platform-aware activation instructions (Linux vs Windows)
 
@@ -29,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--framework` CLI option (no longer framework-specific; always PyTorch)
 - `--cuda` CLI option (now interactive with auto-detection)
 - `--mirror` CLI option (now interactive)
-- `--no-sync` CLI option (sync always runs)
+- `--no-sync` CLI option (now confirm-based, can skip each step individually)
 - `--template` CLI option (no templates anymore)
 - `PROJECT_NAME` positional argument (now prompts for target directory)
 - TensorFlow and Scientific Computing framework options
